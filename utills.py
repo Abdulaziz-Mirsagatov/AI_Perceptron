@@ -27,7 +27,7 @@ def visualize_data(data_path, row=1):
     plt.show()
 
 
-def generate_data_sets():
+def generate_data_sets(digits):
     training_set = []
     training_set_labels = []
 
@@ -37,8 +37,34 @@ def generate_data_sets():
     challenge_set = []
     challenge_set_labels = []
 
-    # keeps track of the number of images collected for each digit
-    count = {
+    # keeps track of the number of each digit in the training set
+    training_set_count = {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+    }
+    # keeps track of the number of each digit in the test set
+    test_set_count = {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+    }
+    # keeps track of the number of each digit in the challenge set
+    challenge_set_count = {
         "0": 0,
         "1": 0,
         "2": 0,
@@ -55,23 +81,24 @@ def generate_data_sets():
         images = f1.readlines()
         labels = f2.readlines()
 
-        # collect 400 images of each of the digits 0 and 1 for the training set, the remaining 0 and 1 digits into test set, and 100 images of each 2-9 digits for the challenge set
+        # collect 400 images of each of the specified digits for the training set, 100 for the test set, and 100 for the challenge set
         for i in range(len(labels)):
             label = labels[i].strip()
             # training set
-            if (label == "0" or label == "1") and count[label] < 400:
+            if (label in digits) and training_set_count[label] < 400:
                 training_set.append(images[i])
                 training_set_labels.append(labels[i])
-                count[label] += 1
+                training_set_count[label] += 1
             # test set
-            elif (label == "0" or label == "1"):
+            elif (label in digits) and test_set_count[label] < 100:
                 test_set.append(images[i])
                 test_set_labels.append(labels[i])
+                test_set_count[label] += 1
             # challenge set
-            elif count[label] < 100:
+            elif (label not in digits) and challenge_set_count[label] < 100:
                 challenge_set.append(images[i])
                 challenge_set_labels.append(labels[i])
-                count[label] += 1
+                challenge_set_count[label] += 1
 
     # shuffle the training set and its labels in the same order
     random_seed = randint(1, 10)
