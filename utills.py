@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from random import shuffle, seed, randint
+from random import shuffle, seed, randint, uniform
 
 
 def visualize_data(data_path, row=1):
@@ -127,3 +127,216 @@ def generate_data_sets(digits):
 
 def calculate_net_input(weights, inputs):
     return np.dot(weights, inputs)
+
+
+def simulate_perceptron(digit, learning_rate, epochs):
+    print(f"Perceptron for digit {digit}:\n")
+    with open("output/training_set.txt") as f, open("output/training_set_labels.txt") as f2, open("output/test_set.txt") as f3, open("output/test_set_labels.txt") as f4, open("output/challenge_set.txt") as f5, open("output/challenge_set_labels.txt") as f6:
+        training_set = f.readlines()
+        training_set_labels = f2.readlines()
+
+        test_set = f3.readlines()
+        test_set_labels = f4.readlines()
+
+        challenge_set = f5.readlines()
+
+        # initialize weights
+        weights = []
+        for i in range(len(training_set[0].split("\t")) + 1):
+            weights.append(uniform(0, 0.5))
+
+        weights_untrained = weights.copy()
+        # write out the initial weights to a text file
+        with open(f"output/perceptron_{digit}/initial_weights.txt", "w") as f:
+            for weight in weights_untrained:
+                f.write(str(weight) + "\n")
+
+        # get the output of the untrained perceptron on the training set
+        output_training_set = []
+        for input in training_set:
+            input_arr = np.array([1] + input.split("\t"), dtype=float)
+            net_input = calculate_net_input(weights, input_arr)
+            output_training_set.append(1 if net_input >= 0 else 0)
+
+        # calculate the error fraction
+        false_positives = 0
+        false_negatives = 0
+        for i in range(len(output_training_set)):
+            label = 1 if training_set_labels[i].strip() == digit else 0
+            if output_training_set[i] == 1 and label == 0:
+                false_positives += 1
+            elif output_training_set[i] == 0 and label == 1:
+                false_negatives += 1
+        error_fraction_untrained_training = (
+            false_positives + false_negatives) / len(training_set)
+        print(
+            f"Error fraction of the untrained perceptron on the training set: {str(error_fraction_untrained_training)}\n")
+
+        # get the output of the untrained perceptron on the test set
+        output_untrained_test_set = []
+        for input in test_set:
+            input_arr = np.array([1] + input.split("\t"), dtype=float)
+            net_input = calculate_net_input(weights, input_arr)
+            output_untrained_test_set.append(1 if net_input >= 0 else 0)
+
+        # calculate the error fraction, precision, recall, and F1 score
+        false_positives = 0
+        false_negatives = 0
+        true_positives = 0
+        for i in range(len(output_untrained_test_set)):
+            label = 1 if test_set_labels[i].strip() == digit else 0
+            if output_untrained_test_set[i] == 1 and label == 0:
+                false_positives += 1
+            elif output_untrained_test_set[i] == 0 and label == 1:
+                false_negatives += 1
+            elif output_untrained_test_set[i] == 1 and label == 1:
+                true_positives += 1
+        error_fraction_untrained_test = (
+            false_positives + false_negatives) / len(test_set)
+        precision_untrained_test = true_positives / \
+            (true_positives + false_positives)
+        recall_untrained_test = true_positives / \
+            (true_positives + false_negatives)
+        f1_score_untrained_test = 2 * ((precision_untrained_test * recall_untrained_test) /
+                                       (precision_untrained_test + recall_untrained_test))
+        with open(f"output/perceptron_{digit}/untrained_metrics.txt", "w") as f:
+            f.write(f"Error fraction: {str(error_fraction_untrained_test)}\n")
+            f.write(f"Precision: {str(precision_untrained_test)}\n")
+            f.write(f"Recall: {str(recall_untrained_test)}\n")
+            f.write(f"F1 score: {str(f1_score_untrained_test)}\n")
+
+        # train the perceptron
+        weights = weights_untrained.copy()
+        weights_trained = np.array(weights)
+        error_fractions = []
+        for i in range(epochs):
+            output_training_set = []
+            for j in range(len(training_set)):
+                input_arr = np.array(
+                    [1] + training_set[j].split("\t"), dtype=float)
+                net_input = calculate_net_input(weights_trained, input_arr)
+                output = 1 if net_input > 0 else 0
+                output_training_set.append(output)
+                label = 1 if training_set_labels[j].strip() == digit else 0
+                error = label - output
+                weights_trained += learning_rate * error * input_arr
+            # calculate the error fraction
+            false_positives = 0
+            false_negatives = 0
+            for j in range(len(output_training_set)):
+                label = 1 if training_set_labels[j].strip() == digit else 0
+                if output_training_set[j] == 1 and label == 0:
+                    false_positives += 1
+                elif output_training_set[j] == 0 and label == 1:
+                    false_negatives += 1
+            error_fraction = (false_positives + false_negatives) / \
+                len(training_set)
+            error_fractions.append(error_fraction)
+        # write out the error fractions to a text file and write out the trained weights to a different text file
+        with open(f"output/perceptron_{digit}/training_error_fractions.txt", "w") as f, open(f"output/perceptron_{digit}/trained_weights.txt", "w") as f2:
+            for error_fraction in error_fractions:
+                f.write(str(error_fraction) + "\n")
+            for weight in weights_trained:
+                f2.write(str(weight) + "\n")
+
+        # get the output of the trained perceptron on the test set
+        output_trained_test_set = []
+        weights = weights_trained.copy()
+        for input in test_set:
+            input_arr = np.array([1] + input.split("\t"), dtype=float)
+            net_input = calculate_net_input(weights, input_arr)
+            output_trained_test_set.append(1 if net_input >= 0 else 0)
+        # calculate the error fraction, precision, recall, and F1 score
+        false_positives = 0
+        false_negatives = 0
+        true_positives = 0
+        for i in range(len(output_trained_test_set)):
+            label = 1 if test_set_labels[i].strip() == digit else 0
+            if output_trained_test_set[i] == 1 and label == 0:
+                false_positives += 1
+            elif output_trained_test_set[i] == 0 and label == 1:
+                false_negatives += 1
+            elif output_trained_test_set[i] == 1 and label == 1:
+                true_positives += 1
+        error_fraction_trained_test = (
+            false_positives + false_negatives) / len(test_set)
+        precision_trained_test = true_positives / \
+            (true_positives + false_positives)
+        recall_trained_test = true_positives / \
+            (true_positives + false_negatives)
+        f1_score_trained_test = 2 * ((precision_trained_test * recall_trained_test) /
+                                     (precision_trained_test + recall_trained_test))
+        # write out the metrics to a text file
+        with open(f"output/perceptron_{digit}/trained_metrics.txt", "w") as f:
+            f.write(f"Error fraction: {str(error_fraction_trained_test)}\n")
+            f.write(f"Precision: {str(precision_trained_test)}\n")
+            f.write(f"Recall: {str(recall_trained_test)}\n")
+            f.write(f"F1 score: {str(f1_score_trained_test)}\n")
+
+        # create a range of bias weights
+        weights = weights_trained.copy()
+        trained_bias_weight = weights[0]
+        new_bias_weights = np.linspace(
+            trained_bias_weight - 10, trained_bias_weight + 10, 20)
+        new_bias_weights = np.concatenate(
+            (new_bias_weights[:11], [trained_bias_weight], new_bias_weights[11:]))
+        # write out the new bias weights to a text file
+        with open(f"output/perceptron_{digit}/new_bias_weights.txt", "w") as f:
+            for bias_weight in new_bias_weights:
+                f.write(str(bias_weight) + "\n")
+
+        # get the output of the trained perceptron on the test set for each new bias weight
+        # file for writing out the metrics for new bias weights
+        f = open(
+            f"output/perceptron_{digit}/new_bias_weights_metrics.txt", "w")
+        for bias_weight in new_bias_weights:
+            weights[0] = bias_weight
+            output_trained_test_set = []
+            for input in test_set:
+                input_arr = np.array([1] + input.split("\t"), dtype=float)
+                net_input = calculate_net_input(weights, input_arr)
+                output_trained_test_set.append(1 if net_input >= 0 else 0)
+            # calculate the error fraction
+            false_positives = 0
+            false_negatives = 0
+            true_positives = 0
+            for i in range(len(output_trained_test_set)):
+                label = 1 if test_set_labels[i].strip() == digit else 0
+                if output_trained_test_set[i] == 1 and label == 0:
+                    false_positives += 1
+                elif output_trained_test_set[i] == 0 and label == 1:
+                    false_negatives += 1
+                elif output_trained_test_set[i] == 1 and label == 1:
+                    true_positives += 1
+            # calculate the error fraction, precision, recall, F1 score, and specificity
+            error_fraction = (
+                false_positives + false_negatives) / len(test_set)
+            precision = 1 if (true_positives + false_positives) == 0 else true_positives / \
+                (true_positives + false_positives)
+            recall = 1 if (true_positives + false_negatives) == 0 else true_positives / \
+                (true_positives + false_negatives)
+            f1_score = 2 * ((precision * recall) / (precision + recall))
+            specificity = 1 if (true_positives + false_positives) == 0 else true_positives / \
+                (true_positives + false_positives)
+            error_fractions.append(error_fraction)
+            # write out the metrics to the file
+            f.write(f"Error fraction: {str(error_fraction)}\n")
+            f.write(f"Precision: {str(precision)}\n")
+            f.write(f"Recall: {str(recall)}\n")
+            f.write(f"F1 score: {str(f1_score)}\n")
+            f.write(f"Specificity: {str(specificity)}\n")
+        f.close()
+
+        # get the output of the trained perceptron on the challenge set
+        output_challenge_set = []
+        weights = weights_trained.copy()
+        for i in range(len(challenge_set)):
+            input = challenge_set[i]
+            input_arr = np.array([1] + input.split("\t"), dtype=float)
+            net_input = calculate_net_input(weights, input_arr)
+            output = 1 if net_input >= 0 else 0
+            output_challenge_set.append(output)
+        # write out the output of the trained perceptron on the challenge set to a text file
+        with open(f"output/perceptron_{digit}/challenge_set_output.txt", "w") as f:
+            for output in output_challenge_set:
+                f.write(str(output) + "\n")
