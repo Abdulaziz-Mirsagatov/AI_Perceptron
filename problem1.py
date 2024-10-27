@@ -2,18 +2,17 @@ from utills import *
 from os import makedirs
 import matplotlib.pyplot as plt
 
-# make the necessary directories
-makedirs("output", exist_ok=True)
-# [makedirs(f"output/perceptron_{i}", exist_ok=True) for i in range(10)]
-makedirs("output/perceptron_0", exist_ok=True)
-
-generate_data_sets(["0", "1"])
-
 digit = "1"
 learning_rate = 0.01
 epochs = 10
 
-# train the perceptron for recognizing 0
+# make the necessary directories
+makedirs("output", exist_ok=True)
+makedirs(f"output/perceptron_{digit}", exist_ok=True)
+
+generate_data_sets(["0", "1"])
+
+# train the perceptron for recognizing 1s
 simulate_perceptron(digit, learning_rate, epochs)
 
 with open(f"output/perceptron_{digit}/untrained_metrics.txt", "r") as f1, open(f"output/perceptron_{digit}/training_error_fractions.txt", "r") as f2, open(f"output/perceptron_{digit}/trained_metrics.txt", "r") as f3, open(f"output/perceptron_{digit}/new_bias_weights.txt", "r") as f4, open(f"output/perceptron_{digit}/new_bias_weights_metrics.txt", "r") as f5, open(f"output/perceptron_{digit}/initial_weights.txt", "r") as f6, open(f"output/perceptron_{digit}/trained_weights.txt", "r") as f7, open(f"output/perceptron_{digit}/challenge_set_output.txt", "r") as f8, open("output/challenge_set_labels.txt", "r") as f9:
