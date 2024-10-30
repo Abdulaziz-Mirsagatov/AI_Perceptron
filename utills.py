@@ -129,7 +129,64 @@ def calculate_net_input(weights, inputs):
     return np.dot(weights, inputs)
 
 
-def simulate_perceptron(digit, learning_rate, epochs):
+def calculate_recall(true_positives, false_negatives):  # fraction of positives identified
+    return 1 if (true_positives + false_negatives) == 0 else true_positives / (true_positives + false_negatives)
+
+
+# fraction of negatives identified
+def calculate_specificity(false_positives, true_negatives):
+    return 1 if (false_positives + true_negatives) == 0 else true_negatives / (false_positives + true_negatives)
+
+
+# fraction of identified positives that are correct
+def calculate_precision(true_positives, false_positives):
+    return 1 if (true_positives + false_positives) == 0 else true_positives / (true_positives + false_positives)
+
+
+# fraction of identified negatives that are correct
+def calculate_negative_predictive_value(true_negatives, false_negatives):
+    return 1 if (true_negatives + false_negatives) == 0 else true_negatives / (true_negatives + false_negatives)
+
+
+def calculate_f1_score(precision, recall):
+    return 2 * ((precision * recall) / (precision + recall))
+
+
+def calculate_accuracy(true_positives, true_negatives, false_positives, false_negatives, balanced=True):
+    if balanced:
+        return (true_positives + true_negatives) / (true_positives + true_negatives + false_positives + false_negatives)
+    else:
+        recall = calculate_recall(true_positives, false_negatives)
+        specificity = calculate_specificity(false_positives, true_negatives)
+        return (recall + specificity) / 2
+
+
+def get_metrics(output, labels, digit, balanced=True):
+    false_positives = 0
+    false_negatives = 0
+    true_positives = 0
+    true_negatives = 0
+    for i in range(len(output)):
+        label = 1 if labels[i].strip() == digit else 0
+        if output[i] == 1 and label == 0:
+            false_positives += 1
+        elif output[i] == 0 and label == 1:
+            false_negatives += 1
+        elif output[i] == 1 and label == 1:
+            true_positives += 1
+        else:
+            true_negatives += 1
+    error_fraction = 1 - \
+        calculate_accuracy(true_positives, true_negatives,
+                           false_positives, false_negatives, balanced)
+    precision = calculate_precision(true_positives, false_positives)
+    recall = calculate_recall(true_positives, false_negatives)
+    f1_score = calculate_f1_score(precision, recall)
+    specificity = calculate_specificity(false_positives, true_negatives)
+    return {"error_fraction": error_fraction, "precision": precision, "recall": recall, "f1_score": f1_score, "specificity": specificity}
+
+
+def simulate_perceptron(digit, learning_rate, epochs, balanced=True):
     print(f"Perceptron for digit {digit}:\n")
     with open("output/training_set.txt") as f, open("output/training_set_labels.txt") as f2, open("output/test_set.txt") as f3, open("output/test_set_labels.txt") as f4, open("output/challenge_set.txt") as f5, open("output/challenge_set_labels.txt") as f6:
         training_set = f.readlines()
@@ -159,16 +216,9 @@ def simulate_perceptron(digit, learning_rate, epochs):
             output_training_set.append(1 if net_input >= 0 else 0)
 
         # calculate the error fraction
-        false_positives = 0
-        false_negatives = 0
-        for i in range(len(output_training_set)):
-            label = 1 if training_set_labels[i].strip() == digit else 0
-            if output_training_set[i] == 1 and label == 0:
-                false_positives += 1
-            elif output_training_set[i] == 0 and label == 1:
-                false_negatives += 1
-        error_fraction_untrained_training = (
-            false_positives + false_negatives) / len(training_set)
+        metrics_untrained_training = get_metrics(
+            output_training_set, training_set_labels, digit, balanced)
+        error_fraction_untrained_training = metrics_untrained_training["error_fraction"]
         print(
             f"Error fraction of the untrained perceptron on the training set: {str(error_fraction_untrained_training)}\n")
 
@@ -180,25 +230,13 @@ def simulate_perceptron(digit, learning_rate, epochs):
             output_untrained_test_set.append(1 if net_input >= 0 else 0)
 
         # calculate the error fraction, precision, recall, and F1 score
-        false_positives = 0
-        false_negatives = 0
-        true_positives = 0
-        for i in range(len(output_untrained_test_set)):
-            label = 1 if test_set_labels[i].strip() == digit else 0
-            if output_untrained_test_set[i] == 1 and label == 0:
-                false_positives += 1
-            elif output_untrained_test_set[i] == 0 and label == 1:
-                false_negatives += 1
-            elif output_untrained_test_set[i] == 1 and label == 1:
-                true_positives += 1
-        error_fraction_untrained_test = (
-            false_positives + false_negatives) / len(test_set)
-        precision_untrained_test = true_positives / \
-            (true_positives + false_positives)
-        recall_untrained_test = true_positives / \
-            (true_positives + false_negatives)
-        f1_score_untrained_test = 2 * ((precision_untrained_test * recall_untrained_test) /
-                                       (precision_untrained_test + recall_untrained_test))
+        metrics_untrained_test = get_metrics(
+            output_untrained_test_set, test_set_labels, digit, balanced)
+        error_fraction_untrained_test = metrics_untrained_test["error_fraction"]
+        precision_untrained_test = metrics_untrained_test["precision"]
+        recall_untrained_test = metrics_untrained_test["recall"]
+        f1_score_untrained_test = metrics_untrained_test["f1_score"]
+        # write out the metrics to a text file
         with open(f"output/perceptron_{digit}/untrained_metrics.txt", "w") as f:
             f.write(f"Error fraction: {str(error_fraction_untrained_test)}\n")
             f.write(f"Precision: {str(precision_untrained_test)}\n")
@@ -220,17 +258,10 @@ def simulate_perceptron(digit, learning_rate, epochs):
                 label = 1 if training_set_labels[j].strip() == digit else 0
                 error = label - output
                 weights_trained += learning_rate * error * input_arr
-            # calculate the error fraction
-            false_positives = 0
-            false_negatives = 0
-            for j in range(len(output_training_set)):
-                label = 1 if training_set_labels[j].strip() == digit else 0
-                if output_training_set[j] == 1 and label == 0:
-                    false_positives += 1
-                elif output_training_set[j] == 0 and label == 1:
-                    false_negatives += 1
-            error_fraction = (false_positives + false_negatives) / \
-                len(training_set)
+            # calculate the error fraction of the perceptron on the training set
+            metrics = get_metrics(
+                output_training_set, training_set_labels, digit, balanced)
+            error_fraction = metrics["error_fraction"]
             error_fractions.append(error_fraction)
         # write out the error fractions to a text file and write out the trained weights to a different text file
         with open(f"output/perceptron_{digit}/training_error_fractions.txt", "w") as f, open(f"output/perceptron_{digit}/trained_weights.txt", "w") as f2:
@@ -247,25 +278,12 @@ def simulate_perceptron(digit, learning_rate, epochs):
             net_input = calculate_net_input(weights, input_arr)
             output_trained_test_set.append(1 if net_input >= 0 else 0)
         # calculate the error fraction, precision, recall, and F1 score
-        false_positives = 0
-        false_negatives = 0
-        true_positives = 0
-        for i in range(len(output_trained_test_set)):
-            label = 1 if test_set_labels[i].strip() == digit else 0
-            if output_trained_test_set[i] == 1 and label == 0:
-                false_positives += 1
-            elif output_trained_test_set[i] == 0 and label == 1:
-                false_negatives += 1
-            elif output_trained_test_set[i] == 1 and label == 1:
-                true_positives += 1
-        error_fraction_trained_test = (
-            false_positives + false_negatives) / len(test_set)
-        precision_trained_test = true_positives / \
-            (true_positives + false_positives)
-        recall_trained_test = true_positives / \
-            (true_positives + false_negatives)
-        f1_score_trained_test = 2 * ((precision_trained_test * recall_trained_test) /
-                                     (precision_trained_test + recall_trained_test))
+        metrics_trained_test = get_metrics(
+            output_trained_test_set, test_set_labels, digit, balanced)
+        error_fraction_trained_test = metrics_trained_test["error_fraction"]
+        precision_trained_test = metrics_trained_test["precision"]
+        recall_trained_test = metrics_trained_test["recall"]
+        f1_score_trained_test = metrics_trained_test["f1_score"]
         # write out the metrics to a text file
         with open(f"output/perceptron_{digit}/trained_metrics.txt", "w") as f:
             f.write(f"Error fraction: {str(error_fraction_trained_test)}\n")
@@ -297,27 +315,13 @@ def simulate_perceptron(digit, learning_rate, epochs):
                 net_input = calculate_net_input(weights, input_arr)
                 output_trained_test_set.append(1 if net_input >= 0 else 0)
             # calculate the error fraction
-            false_positives = 0
-            false_negatives = 0
-            true_positives = 0
-            for i in range(len(output_trained_test_set)):
-                label = 1 if test_set_labels[i].strip() == digit else 0
-                if output_trained_test_set[i] == 1 and label == 0:
-                    false_positives += 1
-                elif output_trained_test_set[i] == 0 and label == 1:
-                    false_negatives += 1
-                elif output_trained_test_set[i] == 1 and label == 1:
-                    true_positives += 1
-            # calculate the error fraction, precision, recall, F1 score, and specificity
-            error_fraction = (
-                false_positives + false_negatives) / len(test_set)
-            precision = 1 if (true_positives + false_positives) == 0 else true_positives / \
-                (true_positives + false_positives)
-            recall = 1 if (true_positives + false_negatives) == 0 else true_positives / \
-                (true_positives + false_negatives)
-            f1_score = 2 * ((precision * recall) / (precision + recall))
-            specificity = 1 if (true_positives + false_positives) == 0 else true_positives / \
-                (true_positives + false_positives)
+            metrics = get_metrics(
+                output_trained_test_set, test_set_labels, digit, balanced)
+            error_fraction = metrics["error_fraction"]
+            precision = metrics["precision"]
+            recall = metrics["recall"]
+            f1_score = metrics["f1_score"]
+            specificity = metrics["specificity"]
             error_fractions.append(error_fraction)
             # write out the metrics to the file
             f.write(f"Error fraction: {str(error_fraction)}\n")
